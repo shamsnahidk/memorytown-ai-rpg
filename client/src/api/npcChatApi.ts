@@ -13,6 +13,7 @@ export type ChatResponse = {
   npc_id: string;
   reply: string;
   source: string;
+  retrieved_sources: string[];
 };
 
 const API_BASE_URL = "http://localhost:8000";
