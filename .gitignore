@@ -141,3 +141,20 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Python backend
+server/.venv/
+server/server_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Python test/cache files
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# FastAPI / local backend env
+server/.env

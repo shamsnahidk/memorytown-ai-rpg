@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import "./style.css";
+import { sendNpcChatMessage } from "./api/npcChatApi";
 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
@@ -40,7 +41,7 @@ const NPC_PROFILES: NPCProfile[] = [
     personality: "warm, witty coffee shop owner who knows town gossip",
     topicHint: "coffee shop, rumors, train station, hidden places",
     intro:
-      "Hey, you must be new here. I’m Maya. I run the coffee shop, which basically means I hear everything before everyone else.",
+      "Maya: Hey, you must be new here. I’m Maya. I run the coffee shop, which basically means I hear everything before everyone else.",
   },
   {
     id: "arjun",
@@ -51,7 +52,7 @@ const NPC_PROFILES: NPCProfile[] = [
     personality: "nervous student who lost an important notebook",
     topicHint: "lost notebook, school, park, strange notes",
     intro:
-      "Oh—hi. I’m Arjun. I’m trying not to panic, but I lost my notebook somewhere near the park.",
+      "Arjun: Oh—hi. I’m Arjun. I’m trying not to panic, but I lost my notebook somewhere near the park.",
   },
   {
     id: "lina",
@@ -62,7 +63,7 @@ const NPC_PROFILES: NPCProfile[] = [
     personality: "mysterious librarian who speaks carefully",
     topicHint: "library, old books, town history, locked room",
     intro:
-      "Welcome, traveler. I’m Lina, the librarian. Some stories in MemoryTown are better discovered slowly.",
+      "Lina: Welcome, traveler. I’m Lina, the librarian. Some stories in MemoryTown are better discovered slowly.",
   },
 ];
 
@@ -131,7 +132,7 @@ class WorldScene extends Phaser.Scene {
     this.add.rectangle(460, GAME_HEIGHT / 2, 90, GAME_HEIGHT, 0xd9c7a3);
     this.add.rectangle(460, 280, 110, 110, 0xcbb68f);
 
-    this.add.text(24, 20, "MemoryTown - Day 3 Dialogue Prototype", {
+    this.add.text(24, 20, "MemoryTown - Backend Chat Prototype", {
       fontSize: "20px",
       color: "#102a43",
       fontFamily: "Arial",
@@ -435,31 +436,55 @@ class WorldScene extends Phaser.Scene {
     this.chatInput.blur();
   }
 
-  private sendPlayerMessage() {
+  private async sendPlayerMessage() {
     if (!this.activeNpc) return;
 
+    const npcId = this.activeNpc.id;
     const message = this.chatInput.value.trim();
 
     if (!message) return;
 
-    const history = this.chatHistory.get(this.activeNpc.id) ?? [];
+    const history = this.chatHistory.get(npcId) ?? [];
 
     history.push({
       sender: "player",
       text: message,
     });
 
-    const npcReply = this.generateMockReply(this.activeNpc, message);
-
-    history.push({
-      sender: "npc",
-      text: npcReply,
-    });
-
-    this.chatHistory.set(this.activeNpc.id, history);
-
+    this.chatHistory.set(npcId, history);
     this.chatInput.value = "";
-    this.renderChatHistory(this.activeNpc.id);
+    this.renderChatHistory(npcId);
+
+    try {
+      const response = await sendNpcChatMessage({
+        npc_id: npcId,
+        player_message: message,
+        conversation_history: history,
+      });
+
+      const updatedHistory = this.chatHistory.get(npcId) ?? [];
+
+      updatedHistory.push({
+        sender: "npc",
+        text: response.reply,
+      });
+
+      this.chatHistory.set(npcId, updatedHistory);
+      this.renderChatHistory(npcId);
+    } catch (error) {
+      const updatedHistory = this.chatHistory.get(npcId) ?? [];
+
+      updatedHistory.push({
+        sender: "npc",
+        text:
+          "System: I couldn't reach the backend. Make sure the FastAPI server is running on http://localhost:8000.",
+      });
+
+      this.chatHistory.set(npcId, updatedHistory);
+      this.renderChatHistory(npcId);
+
+      console.error(error);
+    }
   }
 
   private renderChatHistory(npcId: string) {
@@ -479,32 +504,6 @@ class WorldScene extends Phaser.Scene {
     });
 
     this.chatLog.scrollTop = this.chatLog.scrollHeight;
-  }
-
-  private generateMockReply(npc: NPCProfile, playerMessage: string): string {
-    const message = playerMessage.toLowerCase();
-
-    if (message.includes("hello") || message.includes("hi")) {
-      return `${npc.name}: Hi. Since you're here, ask me about ${npc.topicHint}.`;
-    }
-
-    if (message.includes("library")) {
-      return `${npc.name}: The library is not just a library. Lina knows more than she admits.`;
-    }
-
-    if (message.includes("notebook")) {
-      return `${npc.name}: Arjun’s notebook went missing near the park. That feels too convenient to be random.`;
-    }
-
-    if (message.includes("coffee")) {
-      return `${npc.name}: Maya’s coffee shop is where half the town pretends not to gossip.`;
-    }
-
-    if (message.includes("park")) {
-      return `${npc.name}: The park is peaceful during the day, but people avoid it after sunset.`;
-    }
-
-    return `${npc.name}: Interesting. I don't know enough to answer that yet, but later my responses will come from a RAG backend instead of this placeholder logic.`;
   }
 }
 
